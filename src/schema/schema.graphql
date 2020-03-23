@@ -1,0 +1,96 @@
+scalar Date
+
+directive @alias(
+  to: String
+) on FIELD_DEFINITION
+
+
+directive @enricher(
+  name: String
+  field: String
+) on FIELD_DEFINITION
+
+type Query {
+  document(id: ID, path: String): Document
+  documents(provider: String, nxql: String): [Document]
+  notes: [Note]
+}
+
+type Rendition {
+  name: String
+  kind: String
+  icon: String
+  url: String
+}
+
+type Document {
+  uid: ID
+  path: String
+  title: String
+  state: String
+  parentRef: String
+  isCheckedOut: Boolean
+  isRecord: Boolean
+  retainUntil: Date
+  hasLegalHold: Boolean
+  isUnderRetentionOrLegalHold: Boolean
+  isVersion: Boolean
+  isProxy: Boolean
+  changeToken: String
+  isTrashed: Boolean
+  lastModified: Date
+
+  # enrichers
+  audit: [String]
+  breadcrumb: [Document]
+  collections: [Document]
+  firstAccessibleAncestor: Document
+  hasContent: Boolean
+  isFavorite: Boolean
+  pendingTasks: [String]
+  permissions: [String]
+  renditions: [Rendition]
+  runnableWorkflows: [String]
+  runningWorkflows: [String] 
+  subscribedNotifications: [String]
+  subtypes: [String]
+  tags: [String]
+  thumbnail: String # @enricher(name: "thumbnail", field: "url")
+}
+
+type Note {
+  title: String
+  content: String @alias(to: "note:note")
+  mimetype: String @alias(to: "note:mime_type")
+  creator: String @alias(to: "dc:creator")
+  created: Date @alias(to: "dc:created")
+  isTrashed: Boolean
+  lastModified: Date
+
+  isFavorite: Boolean #@ enricher(name: "favorites", field: "isFavorite")
+  tags: [String]
+  thumbnail: String
+}
+
+type AuditEvent {
+  source: String
+  name: String
+  category: String
+  docId: String
+  repository: String
+  principalName: String
+  docLifeCycle: String
+  docType: String
+  docPath: String
+  comment: String
+  eventDate: Date
+  logDate: Date
+  eventId: String
+  document: Document
+}
+
+type Subscription {
+  documentCreated: AuditEvent
+  documentModified: AuditEvent
+  documentTrashed: AuditEvent
+}

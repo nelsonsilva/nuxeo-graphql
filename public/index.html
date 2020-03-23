@@ -1,0 +1,95 @@
+<!-- https://github.com/prisma-labs/graphql-playground/blob/master/packages/graphql-playground-html/minimal.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8/>
+  <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui">
+  <title>GraphQL Playground</title>
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/css/index.css" />
+  <link rel="shortcut icon" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/favicon.png" />
+  <script src="https://unpkg.com/nuxeo@3.16.1/nuxeo.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/js/middleware.js"></script>
+</head>
+
+<body>
+  <div id="root">
+    <style>
+      body {
+        background-color: rgb(23, 42, 58);
+        font-family: Open Sans, sans-serif;
+        height: 90vh;
+      }
+
+      #root {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .loading {
+        font-size: 32px;
+        font-weight: 200;
+        color: rgba(255, 255, 255, .6);
+        margin-left: 20px;
+      }
+
+      img {
+        width: 78px;
+        height: 78px;
+      }
+
+      .title {
+        font-weight: 400;
+      }
+    </style>
+    <img src='//cdn.jsdelivr.net/npm/graphql-playground-react/build/logo.png' alt=''>
+    <div class="loading"> Loading
+      <span class="title">GraphQL Playground</span>
+    </div>
+  </div>
+  <script>
+    // register a new OAuth2 client on your Nuxeo Server with 'graphql-client' as client id,
+    // and 'http://localhost:4000/' as redirect uri, or change values below
+    const CLIENT_ID = 'graphql-client';
+    const NUXEO_URL = 'http://localhost:8080/nuxeo';
+
+    function getQueryParameters() {
+      const queryParams = {};
+      const href = window.location.href;
+      if (href.indexOf('?')) {
+        const params = href.substring(href.indexOf('?') + 1).split('&');
+        params.forEach((e) => {
+          const a = e.split('=');
+          queryParams[a[0]] = a[1];
+        });
+      }
+      return queryParams;
+    }
+
+    function initPlayground({ access_token }) {
+      GraphQLPlayground.init(document.getElementById('root'), {
+        "endpoint": "/graphql",
+        "subscriptionEndpoint": "/graphql",
+        "headers": {
+          "Authorization": `Bearer ${access_token}`,
+        }
+      });
+    }
+
+    const { code } = getQueryParameters();
+    if (!code) {
+      var authURL = Nuxeo.oauth2.getAuthorizationURL(NUXEO_URL, CLIENT_ID);
+      window.location.href = authURL;
+    } else {
+      var index = window.location.href.indexOf('?code');
+      history.replaceState(null, null, window.location.href.substring(0, index));
+      Nuxeo.oauth2.fetchAccessTokenFromAuthorizationCode(NUXEO_URL, CLIENT_ID, code)
+        .then(initPlayground)
+        .catch(console.log);
+    }
+  </script>
+</body>
+
+</html>

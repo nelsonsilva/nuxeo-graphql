@@ -1,0 +1,57 @@
+version: "3.5"
+services:
+  zookeeper:
+    image: zookeeper:3.5.6
+    container_name: zookeeper
+    hostname: zookeeper
+    volumes:
+      - ./data/zookeeper/data:/datalog
+      - ./data/zookeeper/log:/data
+  kafka:
+    image: wurstmeister/kafka:2.12-2.3.1
+    container_name: kafka
+    hostname: kafka
+    environment:
+      #KAFKA_BROKER_ID: 1
+      KAFKA_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 10
+      KAFKA_OFFSETS_RETENTION_MINUTES: 20160
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
+      KAFKA_LOG_DIRS: /kafka/log
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    volumes:
+      - ./data/kafka/data:/kafka:rw
+      - ./data/kafka/log:/opt/kafka/log:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  kafkahq:
+    image: tchiotludo/kafkahq:0.9.0
+    container_name: kafkahq
+    hostname: kafkahq
+    depends_on:
+      - kafka
+    ports:
+      - 8081:8080
+    volumes:
+      - ./data/kafkahq/application.yml:/app/application.yml:ro
+  nuxeo:
+    image: nuxeo/nuxeo:master
+    container_name: nuxeo
+    hostname: nuxeo
+    environment:
+      JAVA_OPTS: -Xdebug -Xrunjdwp:transport=dt_socket,address=8787,server=y,suspend=n
+    depends_on:
+      - kafka
+    ports:
+      - 8080:8080
+    volumes:
+      - ./nuxeo/nuxeo.conf:/docker-entrypoint-initnuxeo.d/nuxeo.conf:ro
+      - ./nuxeo/init-nuxeo.sh:/docker-entrypoint-initnuxeo.d/init-nuxeo.sh:ro
+      - ./data/nuxeo/binaries:/var/lib/nuxeo/binaries:rw
+      - ./data/nuxeo/data:/var/lib/nuxeo/data:rw
+      - ./data/nuxeo/packages:/opt/nuxeo/server/packages:rw
