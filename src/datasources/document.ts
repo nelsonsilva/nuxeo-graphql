@@ -1,15 +1,10 @@
-import { RESTDataSource, RequestOptions } from 'apollo-datasource-rest';
+import { NuxeoDataSource } from './base';
 import { Options, buildOptions } from './request';
 
-export class DocumentAPI extends RESTDataSource {
+export class DocumentAPI extends NuxeoDataSource {
   
   constructor() {
     super();
-    this.baseURL = 'http://localhost:8080/nuxeo/api/v1';
-  }
-
-  willSendRequest(request: RequestOptions) {
-    request.headers.set('Authorization', this.context.token);
   }
 
   async getById(id: string, options: Options = {}) {

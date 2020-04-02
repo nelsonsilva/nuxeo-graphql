@@ -1,23 +1,16 @@
 import http from 'http';
 import express from 'express';
-import { gql, ApolloServer } from 'apollo-server-express';
-import { readFileSync } from 'fs';
+import { schema } from './schema';
+import { ApolloServer } from 'apollo-server-express';
 import { dataSources } from './datasources';
-import resolvers from './resolvers';
-import schemaDirectives from './directives';
 import { consume } from './kafka';
 import { publish, EVENTS } from './pubsub';
 
-const SCHEMA = './src/schema/schema.graphql';
-const typeDefs = gql`${readFileSync(SCHEMA, 'utf8')}`;
-
 const server = new ApolloServer({
-  typeDefs,
-  resolvers,
+  schema,
   dataSources,
-  schemaDirectives,
-  playground: false,
-  tracing: true,
+  playground: true,
+  // tracing: true,
   context: async (ctx: any) => {
     // https://www.apollographql.com/docs/apollo-server/data/subscriptions/#context-with-subscriptions
     if (ctx.connection) {
@@ -36,7 +29,8 @@ const server = new ApolloServer({
     } else {
       // check from req
       const token = ctx.req.headers.authorization || '';
-      return { token };
+      const cookie = ctx.req.headers.cookie;
+      return { token, cookie };
     }
   },
   subscriptions: {

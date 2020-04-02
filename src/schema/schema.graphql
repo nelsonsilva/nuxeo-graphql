@@ -1,18 +1,61 @@
 scalar Date
+scalar JSON
+scalar JSONObject
 
 directive @alias(
   to: String
 ) on FIELD_DEFINITION
-
 
 directive @enricher(
   name: String
   field: String
 ) on FIELD_DEFINITION
 
+input PaginationArguments {
+  currentPageIndex: Int
+  pageSize: Int
+  offset: Int
+}
+
+type TaskAction {
+  name: String
+  url: String
+  label: String
+  validate: Boolean
+}
+
+type TaskInfo {
+  allowTaskReassignment: Boolean
+  taskActions: [TaskAction]
+}
+
+type Task {
+  id: ID
+  name: String
+  workflowInstanceId: String
+  workflowModelName: String
+  workflowInitiator: String
+  workflowTitle: String
+  workflowLifeCycleState: String
+  graphResource: String
+  state: String
+  directive: String
+  created: Date
+  dueDate: Date
+  nodeName: String
+  targetDocumentIds: [Document] # @fetcher(name: "task", field: "targetDocumentIds")
+  actors: [User] # @fetcher(name: "task", field: "actors")
+  delegatedActors: [User]
+  comments: [String]
+  variables: JSONObject
+  taskInfo: TaskInfo
+}
+
 type Query {
   document(id: ID, path: String): Document
-  documents(provider: String, nxql: String): [Document]
+  search(provider: String, query: String, params: JSONObject, queryParams: [String], pagination: PaginationArguments): Results
+  nxql(nxql: String, pagination: PaginationArguments): Results
+  tasks(params: JSONObject, pagination: PaginationArguments): Results
   notes: [Note]
 }
 
@@ -23,11 +66,42 @@ type Rendition {
   url: String
 }
 
+union Pageable = Document | Task
+
+type Results {
+  isPaginable: Boolean
+  resultsCount: Int
+  pageSize: Int
+  maxPageSize: Int
+  resultsCountLimit: Int
+  currentPageSize: Int
+  currentPageIndex: Int
+  currentPageOffset: Int
+  numberOfPages: Int
+  isPreviousPageAvailable: Boolean
+  isNextPageAvailable: Boolean
+  isLastPageAvailable: Boolean
+  isSortable: Boolean
+  hasError: Boolean
+  errorMessage: String
+  totalSize: Int
+  pageIndex: Int
+  pageCount: Int
+  entries: [Pageable]
+}
+
+input Enrichers {
+  document: [String]
+  blob: [String]
+}
+
 type Document {
   uid: ID
   path: String
   title: String
+  repository: String
   state: String
+  type: String
   parentRef: String
   isCheckedOut: Boolean
   isRecord: Boolean
@@ -39,6 +113,7 @@ type Document {
   changeToken: String
   isTrashed: Boolean
   lastModified: Date
+  facets: [String]
 
   # enrichers
   audit: [String]
@@ -56,6 +131,10 @@ type Document {
   subtypes: [String]
   tags: [String]
   thumbnail: String # @enricher(name: "thumbnail", field: "url")
+
+  # compat
+  properties(schemas: [String]): JSONObject
+  contextParameters(enrichers: Enrichers): JSONObject
 }
 
 type Note {

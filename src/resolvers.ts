@@ -1,5 +1,6 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { parseResolveInfo, simplifyParsedResolveInfoFragmentWithType, ResolveTree } from 'graphql-parse-resolve-info';
+import GraphQLJSON, { GraphQLJSONObject } from 'graphql-type-json';
 import { DataSources } from './datasources';
 import { subscribe, EVENTS } from './pubsub';
 
@@ -28,17 +29,29 @@ const ENRICHERS = {
   thumbnail: (doc: any) => doc.contextParameters.thumbnail.url,
 };
 
-function getEnrichers(resolveInfo: GraphQLResolveInfo) {
+function getEnrichers(resolveInfo: GraphQLResolveInfo) : {document: string[]} {
   const info = parseResolveInfo(resolveInfo) as ResolveTree;
-  const { fields } = simplifyParsedResolveInfoFragmentWithType(info, resolveInfo.returnType);
-  // console.debug('info', info.fieldsByTypeName);
-  return [...new Set(Object.keys(fields).map(k => {
+  const fields: any = simplifyParsedResolveInfoFragmentWithType(info, resolveInfo.returnType).fields;
+  
+  // legacy behavior
+  if (fields.contextParameters) {
+    return fields.contextParameters.args.enrichers;
+  }
+
+  if (fields.entries) {
+    const docFields = fields.entries.fieldsByTypeName.Document;
+    if (docFields.contextParameters) {
+      return docFields.contextParameters.args && docFields.contextParameters.args.enrichers;
+    }
+  }
+
+  return {document: [...new Set(Object.keys(fields).map(k => {
     if (ENRICHERS.hasOwnProperty(k)) {
       return k;
     } else if (ENRICHER_FIELDS.hasOwnProperty(k)) {
       return ENRICHER_FIELDS[k];
     }
-  }).filter(Boolean))];
+  }).filter(Boolean))]};
 }
 
 export default {
@@ -47,18 +60,39 @@ export default {
       const enrichers = getEnrichers(resolveInfo);
       return await id ? document.getById(id, { enrichers }) : document.getByPath(path, { enrichers });
     },
-    documents: async (_ : null, { nxql }: { nxql: string}, { dataSources: { search }} : Context, resolveInfo: GraphQLResolveInfo) => {
+    search: async (_ : null, { provider, query, params, queryParams, pagination }: { provider: string, query: string, params: any, queryParams: [string], pagination: any }, { dataSources: { search }} : Context, resolveInfo: GraphQLResolveInfo) => {
       const enrichers = getEnrichers(resolveInfo);
-      return await search.nxql(nxql, undefined, { enrichers });
+      if (query) {
+        return await search.nxql(query, {  ...params, ...pagination }, { enrichers });
+      }
+      return await search.search(provider, { ...queryParams && { queryParams }, ...params, ...pagination }, { enrichers });
+    },
+    nxql: async (_ : null, { nxql, pagination }: { nxql: string, pagination: any }, { dataSources: { search }} : Context, resolveInfo: GraphQLResolveInfo) => {
+      const enrichers = getEnrichers(resolveInfo);
+      return await search.nxql(nxql, {  ...pagination }, { enrichers });
+    },
+    tasks: async (_ : null, { params, pagination }: { params: any, pagination: any }, { dataSources: { task }} : Context, resolveInfo: GraphQLResolveInfo) => {
+      return await task.tasks({ ...params, ...pagination }, {fetchers: {task: ['targetDocumentIds', 'actors']}});
     },
     notes: async (_: null, args: null, { dataSources: { search }} : Context, resolveInfo: GraphQLResolveInfo) => {
       const enrichers = getEnrichers(resolveInfo);
       return await search.nxql('SELECT * FROM Note WHERE ecm:mixinType != "HiddenInNavigation" AND ecm:isProxy = 0 AND ecm:isVersion = 0 AND ecm:isTrashed = 0', undefined, { enrichers });
     },
   },
+  // JSON
+  JSON: GraphQLJSON,
+  JSONObject: GraphQLJSONObject,
+  // Document
   Document: {
     ...ENRICHERS,
     isFavorite: (doc: any) => doc.contextParameters.favorites.isFavorite,
+
+    properties: (doc: any, { schemas } : { schemas: [string]}) =>  doc.properties,
+    contextParameters: (doc: any, { enrichers } : { enrichers: [string]})=> doc.contextParameters,
+  },
+  // Union type
+  Pageable: {
+    __resolveType: (obj: any) => obj['entity-type'][0].toUpperCase() + obj['entity-type'].slice(1),
   },
   Note: {
     tags: ENRICHERS.tags,

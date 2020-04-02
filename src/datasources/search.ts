@@ -1,33 +1,28 @@
-import { RESTDataSource, RequestOptions } from 'apollo-datasource-rest';
+import { NuxeoDataSource } from './base';
 import { Options, buildOptions } from './request';
 
 export interface SearchParams {
-  currentPageIndex?: Number,
-  offset?: Number,
-  pageSize?: Number
+  currentPageIndex?: number,
+  offset?: number,
+  pageSize?: number,
+  queryParams?: [string]
 }
 
-export class SearchAPI extends RESTDataSource {
+export class SearchAPI extends NuxeoDataSource {
   
   constructor() {
-    super();
-    this.baseURL = 'http://localhost:8080/nuxeo/api/v1/search';
+    super('search');
   }
 
-  willSendRequest(request: RequestOptions) {
-    request.headers.set('Authorization', this.context.token);
-    request.headers.set('properties', '*');
-  }
-
-  async nxql(nxql: string, params: SearchParams = {}, options: Options = {}) {
-    const res = await this.get(
-      `pp/nxql_search/execute`,
-      {
-        ...params,
-        queryParams: nxql
-      },
+  async search(provider: string, params: SearchParams = {}, options: Options = {}) {
+    return await this.get(
+      `pp/${provider}/execute`,
+      { ...params },
       buildOptions(options)
     );
-    return res.entries;
+  }
+  
+  async nxql(nxql: string, params: SearchParams = {}, options: Options = {}) {
+    return await this.search('nxql_search',{ ...params, queryParams: [nxql] }, options);
   }
 }
